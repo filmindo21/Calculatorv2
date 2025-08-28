@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Casio fx-991ES PLUS — Emulator (FULL)</title>
+
+<!--
+  FULL Emulator (single HTML). Uses CDN by default.
+  Jika ingin 100% offline:
+  1. Download math.min.js dari https://cdnjs.cloudflare.com/ajax/libs/mathjs/13.6.0/math.min.js
+     dan simpan di folder yang sama (mis. math.min.js)
+  2. Download MathJax (basic bundle) dan taruh folder mathjax di folder yang sama,
+     lalu ganti src MathJax di bawah menjadi "./mathjax/es5/tex-mml-chtml.js"
+  3. Setelah file lokal tersedia, ubah tag <script src="..."> sesuai file lokal.
+-->
+
+<!-- math.js (engine) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/13.6.0/math.min.js"></script>
+
+<!-- MathJax (natural display) -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+:root{
+  --bg:#f6f5f7; --panel:#efe7ec; --screen:#eaf7ea; --muted:#7a6a6f;
+  --accent:#d8a6b7; --btn:#fff; --danger:#ffdede;
+  --radius:14px;
+  --shadow: 0 10px 25px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box}
+body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background:linear-gradient(180deg,#fff,#f5f3f6); color:#231f20; padding:18px;}
+.container{max-width:1100px; margin:0 auto; display:grid; grid-template-columns:460px 1fr; gap:18px; align-items:start;}
+.card{background:var(--panel); border-radius:var(--radius); padding:14px; box-shadow:var(--shadow);}
+
+/* Calculator */
+.calc{display:flex; flex-direction:column; gap:12px;}
+.header{display:flex; justify-content:space-between; align-items:center;}
+.brand{font-weight:800}
+.modes{display:flex; gap:8px}
+.modes button{border:0; padding:8px 10px; border-radius:10px; background:#fff; cursor:pointer; font-weight:700}
+.modes button.active{background:var(--accent); color:#fff}
+
+.screen{background:var(--screen); border-radius:12px; padding:12px; min-height:100px; border:1px solid #d6e7d8; display:flex; flex-direction:column; justify-content:center; gap:6px; overflow:hidden}
+.display-expr{font-size:0.95rem; color:var(--muted); min-height:28px; word-break:break-word}
+.display-res{font-size:1.6rem; font-weight:800; text-align:right; word-break:break-word; min-height:34px}
+
+.controls{display:flex; gap:8px; justify-content:space-between; align-items:center}
+.small{font-size:.9rem; color:var(--muted)}
+
+.keyboard{display:grid; grid-template-columns: repeat(6, 1fr); gap:8px;}
+button.key{padding:12px; border-radius:10px; border:0; background:var(--btn); font-weight:800; cursor:pointer; box-shadow:0 6px 12px rgba(0,0,0,.06)}
+button.key.rose{background:var(--accent); color:#fff}
+button.key.warn{background:var(--danger)}
+.wide2{grid-column: span 2}
+.wide3{grid-column: span 3}
+
+/* Right panel */
+.panel-right{display:flex; flex-direction:column; gap:12px}
+.doc{padding:12px; border-radius:12px; background:#fff}
+label{display:block;font-size:.9rem;margin-bottom:6px;color:var(--muted)}
+input[type=text], textarea, select{width:100%; padding:8px;border-radius:8px;border:1px solid #e7e7e7}
+.pre{white-space:pre-wrap; background:#fbfbfb; padding:8px; border-radius:8px; border:1px solid #f0f0f0; max-height:220px; overflow:auto}
+
+/* History UI */
+.hist-list{max-height:200px; overflow:auto; margin-top:8px; display:flex; flex-direction:column; gap:6px}
+.hist-item{padding:8px;border-radius:8px;background:#fafafa;border:1px solid #f0f0f0;cursor:pointer}
+
+.footer{font-size:.85rem;color:var(--muted)}
+kbd{background:#eee;border-radius:6px;padding:2px 6px;font-size:.85em}
+</style>
+</head>
+<body>
+  <div class="container">
+    <!-- LEFT: Calculator -->
+    <div class="card calc" id="calcCard">
+      <div class="header">
+        <div>
+          <div class="brand">CASIO — fx-991ES (EMU) FULL</div>
+          <div style="font-size:.85rem;color:var(--muted)">Advanced offline-capable emulator</div>
+        </div>
+        <div class="modes" role="tablist">
+          <button class="active" data-mode="COMP">COMP</button>
+          <button data-mode="STAT">STAT</button>
+          <button data-mode="EQN">EQN</button>
+          <button data-mode="MATRIX">MATRIX</button>
+          <button data-mode="BASE">BASE-N</button>
+        </div>
+      </div>
+
+      <div class="screen" aria-live="polite">
+        <div id="exprTex" class="display-expr">\( \)</div>
+        <div id="resTex" class="display-res">0</div>
+      </div>
+
+      <div class="controls">
+        <div class="small">Ans: <span id="ansVal">0</span> — Mem: <span id="memVal">0</span></div>
+        <div>
+          <button class="smallbtn" id="prevHist">Prev</button>
+          <button class="smallbtn" id="nextHist">Next</button>
+        </div>
+      </div>
+
+      <div class="keyboard" id="keys">
+        <!-- row 1 -->
+        <button class="key" data-in="shift">SHIFT</button>
+        <button class="key" data-in="alpha">ALPHA</button>
+        <button class="key" data-in="mode">MODE</button>
+        <button class="key" data-in="setup">SETUP</button>
+        <button class="key" data-act="AC">AC</button>
+        <button class="key warn" data-act="DEL">DEL</button>
+
+        <!-- row 2 -->
+        <button class="key" data-in="("> ( </button>
+        <button class="key" data-in=")"> ) </button>
+        <button class="key" data-in="^">x^y</button>
+        <button class="key" data-in="sqrt(">√</button>
+        <button class="key" data-in="pi">π</button>
+        <button class="key" data-in="e">e</button>
+
+        <!-- row 3 -->
+        <button class="key" data-in="7">7</button>
+        <button class="key" data-in="8">8</button>
+        <button class="key" data-in="9">9</button>
+        <button class="key" data-in="/">÷</button>
+        <button class="key" data-in="sin(">sin</button>
+        <button class="key" data-in="asin(">sin⁻¹</button>
+
+        <!-- row 4 -->
+        <button class="key" data-in="4">4</button>
+        <button class="key" data-in="5">5</button>
+        <button class="key" data-in="6">6</button>
+        <button class="key" data-in="*">×</button>
+        <button class="key" data-in="cos(">cos</button>
+        <button class="key" data-in="acos(">cos⁻¹</button>
+
+        <!-- row 5 -->
+        <button class="key" data-in="1">1</button>
+        <button class="key" data-in="2">2</button>
+        <button class="key" data-in="3">3</button>
+        <button class="key" data-in="-">−</button>
+        <button class="key" data-in="tan(">tan</button>
+        <button class="key" data-in="atan(">tan⁻¹</button>
+
+        <!-- row 6 -->
+        <button class="key wide2" data-in="0">0</button>
+        <button class="key" data-in=".">.</button>
+        <button class="key" data-in="+">+</button>
+        <button class="key rose wide2" data-act="EVAL">=</button>
+
+        <!-- row 7 advanced -->
+        <button class="key" data-fn="derivative">d/dx</button>
+        <button class="key" data-fn="integral">∫</button>
+        <button class="key" data-fn="matrix">MATRIX</button>
+        <button class="key" data-fn="vector">VECTOR</button>
+        <button class="key" data-fn="stats">STAT</button>
+        <button class="key" data-fn="base">BASE</button>
+
+        <!-- row 8 misc -->
+        <button class="key" data-op="nCr">nCr</button>
+        <button class="key" data-op="nPr">nPr</button>
+        <button class="key" data-op="%">mod</button>
+        <button class="key" data-op="!">x!</button>
+        <button class="key" data-op="Ans">Ans</button>
+        <button class="key" data-op="M+">M+</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Controls, history, logs -->
+    <div class="panel-right">
+      <div class="doc card">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <strong>Control Panel</strong>
+          <div style="display:flex; gap:8px">
+            <button class="smallbtn" id="exportBtn">Export (HTML state)</button>
+            <button class="smallbtn" id="clearStorage">Clear Storage</button>
+          </div>
+        </div>
+
+        <div style="margin-top:8px">
+          <label>Mode aktif: <span id="modeLabel">COMP</span></label>
+          <label>Raw expression:</label>
+          <pre id="rawExpr" class="pre">(empty)</pre>
+        </div>
+
+        <div style="margin-top:8px">
+          <label>History / Replay (klik untuk load)</label>
+          <div id="histList" class="hist-list"></div>
+        </div>
+
+        <div style="margin-top:8px">
+          <label>Console / Log</label>
+          <pre id="log" class="pre">Ready.</pre>
+        </div>
+
+        <div style="margin-top:8px">
+          <label>Offline instructions</label>
+          <small style="color:var(--muted)">Untuk 100% offline, download math.min.js & MathJax lalu ganti tag &lt;script src=&quot;...&quot;&gt; ke path lokal.</small>
+        </div>
+      </div>
+
+      <div class="doc card">
+        <strong>Shortcuts</strong>
+        <p><kbd>0–9</kbd>, <kbd>+</kbd>, <kbd>-</kbd>, <kbd>*</kbd>, <kbd>/</kbd>, <kbd>^</kbd>, <kbd>(</kbd>, <kbd>)</kbd>, <kbd>Enter</kbd>=eval, <kbd>Backspace</kbd>=DEL, <kbd>Esc</kbd>=AC. Tekan <kbd>p</kbd> untuk π, <kbd>a</kbd> untuk Ans.</p>
+        <div class="footer">Saved to localStorage: memory, ans, history, last expression.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------- State & Elements ---------- */
+const modeButtons = document.querySelectorAll('.modes button');
+const exprElem = document.getElementById('exprTex');
+const resElem = document.getElementById('resTex');
+const rawExprEl = document.getElementById('rawExpr');
+const logEl = document.getElementById('log');
+const ansEl = document.getElementById('ansVal');
+const memEl = document.getElementById('memVal');
+const histListEl = document.getElementById('histList');
+const modeLabel = document.getElementById('modeLabel');
+const prevHistBtn = document.getElementById('prevHist');
+const nextHistBtn = document.getElementById('nextHist');
+
+let mode = 'COMP';
+let expr = '';
+let ans = 0;
+let memory = 0;
+let history = [];      // array of {expr, result, ts}
+let histIndex = -1;    // for Prev/Next navigation
+
+/* Load from localStorage if present */
+function loadState(){
+  try {
+    const s = localStorage.getItem('casio_full_state');
+    if (s) {
+      const obj = JSON.parse(s);
+      expr = obj.expr || '';
+      ans = obj.ans || 0;
+      memory = obj.memory || 0;
+      history = obj.history || [];
+    }
+  } catch(e){ console.warn('loadState err',e); }
+}
+function saveState(){
+  try {
+    const obj = {expr, ans, memory, history};
+    localStorage.setItem('casio_full_state', JSON.stringify(obj));
+  } catch(e){ console.warn('saveState err',e); }
+}
+
+/* Logging */
+function log(s){
+  const t = '['+ (new Date()).toLocaleTimeString() +'] '+ String(s);
+  logEl.textContent = t + '\\n' + logEl.textContent;
+}
+
+/* Init mode buttons */
+modeButtons.forEach(b=>{
+  b.addEventListener('click', ()=> {
+    modeButtons.forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    mode = b.dataset.mode;
+    modeLabel.textContent = mode;
+    log('Mode → '+mode);
+  });
+});
+
+/* Render function: parse -> toTex -> MathJax typeset -> evaluate (safely) */
+function renderAll(){
+  rawExprEl.textContent = expr || '(empty)';
+  try {
+    if (!expr.trim()) {
+      exprElem.innerHTML = '\\(\\)';
+      resElem.textContent = '0';
+    } else {
+      // convert special tokens for display: Ans -> Ans (ke MathJax), factorial !
+      // Use math.parse to get node and toTex
+      const node = math.parse(expr);
+      const tex = node.toTex({parentheses:'keep',implicit:false});
+      exprElem.innerHTML = '\\(' + tex + '\\)';
+      // evaluate (replace Ans token with current ans)
+      let evalExpr = expr.replace(/\\bAns\\b/g, String(ans));
+      const val = math.evaluate(evalExpr);
+      // format result
+      if (typeof val === 'number' || math.typeOf(val) === 'BigNumber') {
+        resElem.textContent = String(val);
+        ans = Number(val);
+        ansEl.textContent = String(ans);
+      } else if (Array.isArray(val) || math.typeOf(val) === 'Matrix') {
+        resElem.textContent = JSON.stringify(val);
+      } else if (math.typeOf(val) === 'Complex') {
+        resElem.textContent = val.toString();
+      } else {
+        resElem.textContent = String(val);
+      }
+    }
+  } catch(e){
+    // invalid expression -> show raw and Error
+    exprElem.textContent = expr || '(empty)';
+    resElem.textContent = 'Error';
+  } finally {
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise().catch(()=>{});
+  }
+  saveState();
+}
+
+/* Evaluate & push to history */
+function evaluateExpression(){
+  try {
+    const evalExpr = expr.replace(/\\bAns\\b/g, String(ans));
+    const val = math.evaluate(evalExpr);
+    const resStr = (typeof val === 'object') ? JSON.stringify(val) : String(val);
+    // push to history
+    const item = {expr, result: resStr, ts: Date.now()};
+    history.unshift(item); // newest first
+    if (history.length > 200) history.pop();
+    histIndex = -1;
+    rebuildHistoryUI();
+    log('Eval: ' + expr + ' = ' + resStr);
+    // set expr to result like Casio
+    expr = String((typeof val === 'number' || math.typeOf(val)==='BigNumber') ? Number(val) : resStr);
+    renderAll();
+  } catch(e){
+    resElem.textContent = 'Error';
+    log('Eval error: ' + e);
+  }
+}
+
+/* Buttons handler */
+document.getElementById('keys').addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('button.key');
+  if (!btn) return;
+  const ins = btn.dataset.in;
+  const act = btn.dataset.act;
+  const fn = btn.dataset.fn;
+  const op = btn.dataset.op;
+
+  if (ins) {
+    /* special non-text keys */
+    if (ins === 'shift' || ins === 'alpha' || ins === 'mode' || ins === 'setup'){
+      log('Special key: ' + ins);
+      return;
+    }
+    expr += ins;
+    renderAll();
+  }
+  if (op) handleOp(op);
+  if (act) handleAct(act);
+  if (fn) handleFn(fn);
+});
+
+/* operator buttons */
+function handleOp(op){
+  if (op === 'nCr') expr += 'choose(';
+  else if (op === 'nPr') expr += 'permute(';
+  else if (op === '%') expr += '%';
+  else if (op === '!') expr += '!';
+  else if (op === 'Ans') expr += 'Ans';
+  else if (op === 'M+') { memory += ans; memEl.textContent = String(memory); log('M+ memory now ' + memory); }
+  renderAll();
+}
+
+/* actions */
+function handleAct(act){
+  if (act === 'AC') { expr = ''; renderAll(); }
+  else if (act === 'DEL') { expr = expr.slice(0,-1); renderAll(); }
+  else if (act === 'EVAL') { evaluateExpression(); saveState(); }
+}
+
+/* advanced functions dispatcher */
+function handleFn(fn){
+  switch(fn){
+    case 'derivative': derivativePrompt(); break;
+    case 'integral': integralPrompt(); break;
+    case 'matrix': matrixDialog(); break;
+    case 'vector': vectorDialog(); break;
+    case 'stats': statsDialog(); break;
+    case 'base': baseDialog(); break;
+    default: log('Unknown fn ' + fn);
+  }
+}
+
+/* ---------- Advanced Implementations ---------- */
+
+/* Derivative (symbolic) */
+function derivativePrompt(){
+  const f = prompt('Masukkan f(x) untuk d/dx (contoh: sin(x)^2):','x^2');
+  if (!f) return;
+  try {
+    const d = math.derivative(f, 'x');
+    expr = d.toString();
+    resElem.textContent = d.toString();
+    exprElem.innerHTML = '\\(' + d.toTex() + '\\)';
+    if (window.MathJax) MathJax.typesetPromise().catch(()=>{});
+    log('Derivative of ' + f + ' → ' + d.toString());
+    saveState();
+  } catch(e){
+    alert('Error menghitung turunan: ' + e);
+    log('Derivative error ' + e);
+  }
+}
+
+/* Integral (adaptive Simpson numeric) */
+function integralPrompt(){
+  const f = prompt('Masukkan f(x) untuk integral numerik (contoh: x^2):','x^2');
+  if (!f) return;
+  const aS = prompt('Batas bawah (a):','0'); if (aS === null) return;
+  const bS = prompt('Batas atas (b):','1'); if (bS === null) return;
+  const a = Number(aS), b = Number(bS);
+  if (isNaN(a) || isNaN(b)) { alert('Batas harus angka'); return; }
+  try {
+    const node = math.parse(f);
+    const code = node.compile();
+    function fnum(x){ return Number(code.evaluate({x})); }
+
+    function simpson(f,a,b){ const c=(a+b)/2; return (f(a)+4*f(c)+f(b))*(b-a)/6; }
+    function adaptive(f,a,b,eps,whole){
+      const c = (a+b)/2;
+      const left = simpson(f,a,c);
+      const right = simpson(f,c,b);
+      if (Math.abs(left+right-whole) <= 15*eps) return left+right + (left+right-whole)/15;
+      return adaptive(f,a,c,eps/2,left) + adaptive(f,c,b,eps/2,right);
+    }
+    const whole = simpson(fnum,a,b);
+    const res = adaptive(fnum,a,b,1e-8,whole);
+    resElem.textContent = String(res);
+    expr = String(res);
+    ans = res;
+    ansEl.textContent = String(ans);
+    log('Integral ' + f + ' from ' + a + ' to ' + b + ' = ' + res);
+    saveState();
+    renderAll();
+  } catch(e){
+    alert('Error integral: ' + e);
+    log('Integral error ' + e);
+  }
+}
+
+/* MATRIX: det + inv (if square) */
+function matrixDialog(){
+  const txt = prompt('Masukkan matriks, contoh [[1,2],[3,4]]:','[[1,2],[3,4]]');
+  if (!txt) return;
+  try {
+    const A = math.evaluate(txt);
+    if (!Array.isArray(A)) throw 'Not matrix';
+    const mat = math.matrix(A);
+    const det = math.det(mat);
+    let inv = null;
+    try { inv = math.inv(mat); } catch(e){ inv = null; }
+    let out = 'det=' + det;
+    if (inv) out += ' inv=' + JSON.stringify(inv);
+    resElem.textContent = out;
+    expr = String(det);
+    log('Matrix processed: ' + out);
+    saveState();
+    renderAll();
+  } catch(e){
+    alert('Error matrix: ' + e);
+    log('Matrix error ' + e);
+  }
+}
+
+/* VECTOR: dot & cross */
+function vectorDialog(){
+  const txt = prompt('Masukkan dua vektor [[1,2,3],[4,5,6]]:', '[[1,2,3],[4,5,6]]');
+  if (!txt) return;
+  try {
+    const v = math.evaluate(txt);
+    if (!Array.isArray(v) || v.length < 2) throw 'Invalid';
+    const a = v[0], b = v[1];
+    const dot = math.dot(a,b);
+    let cross = null;
+    try { cross = math.cross(a,b); } catch(e){ cross = 'N/A'; }
+    resElem.textContent = 'dot=' + dot + ' cross=' + JSON.stringify(cross);
+    expr = String(dot);
+    log('Vector: dot=' + dot + ' cross=' + JSON.stringify(cross));
+    saveState();
+    renderAll();
+  } catch(e){
+    alert('Error vector: ' + e);
+    log('Vector error ' + e);
+  }
+}
+
+/* STAT: mean, median, std, simple linear regression */
+function statsDialog(){
+  const txt = prompt('Masukkan data array, contoh [1,2,3,4,5] atau pairs [[x1,y1],[x2,y2],...]:', '[1,2,3,4,5]');
+  if (!txt) return;
+  try {
+    const arr = math.evaluate(txt);
+    const mean = math.mean(arr);
+    const median = math.median(arr);
+    const std = math.std(arr);
+    let reg = '';
+    if (Array.isArray(arr[0])) {
+      const xs = arr.map(p=>p[0]), ys = arr.map(p=>p[1]);
+      const xm = math.mean(xs), ym = math.mean(ys);
+      const num = math.sum(xs.map((x,i)=> (x-xm)*(ys[i]-ym)));
+      const den = math.sum(xs.map(x=> (x-xm)*(x-xm)));
+      const slope = num/den;
+      const intercept = ym - slope*xm;
+      reg = ` slope=${slope.toFixed(6)} intercept=${intercept.toFixed(6)}`;
+    }
+    resElem.textContent = `mean=${mean} median=${median} std=${std.toFixed(6)} ${reg}`;
+    expr = String(mean);
+    log('Stats computed');
+    saveState();
+    renderAll();
+  } catch(e){
+    alert('Error stats: ' + e);
+    log('Stats error ' + e);
+  }
+}
+
+/* BASE conversion */
+function baseDialog(){
+  const type = prompt('Pilih: 1=DEC→BIN/OCT/HEX, 2=BIN/OCT/HEX→DEC', '1');
+  if (!type) return;
+  if (type === '1') {
+    const n = prompt('Masukkan desimal (contoh 255):','255');
+    const d = parseInt(n);
+    if (Number.isNaN(d)) { alert('invalid'); return; }
+    const bin = d.toString(2), oct = d.toString(8), hex = d.toString(16).toUpperCase();
+    resElem.textContent = `BIN=${bin} OCT=${oct} HEX=${hex}`;
+    expr = String(d);
+    log('Base conv dec->others');
+    saveState();
+    renderAll();
+  } else {
+    const s = prompt('Masukkan nomor dan basis, contoh: FF,16','FF,16');
+    if (!s) return;
+    const parts = s.split(',');
+    if (parts.length<2) { alert('format salah'); return; }
+    const num = parts[0].trim();
+    const b = parseInt(parts[1].trim());
+    const dec = parseInt(num, b);
+    if (Number.isNaN(dec)) { alert('invalid'); return; }
+    resElem.textContent = `DEC=${dec}`;
+    expr = String(dec);
+    log('Base conv -> dec');
+    saveState();
+    renderAll();
+  }
+}
+
+/* ---------- History UI ---------- */
+function rebuildHistoryUI(){
+  histListEl.innerHTML = '';
+  history.slice(0,100).forEach((h,i)=>{
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.textContent = `${new Date(h.ts).toLocaleString()} → ${h.expr} = ${h.result}`;
+    div.addEventListener('click', ()=>{ expr = h.expr; renderAll(); });
+    histListEl.appendChild(div);
+  });
+}
+
+/* Prev / Next history navigation */
+prevHistBtn.addEventListener('click', ()=>{
+  if (history.length===0) return;
+  if (histIndex < history.length-1) histIndex++;
+  const item = history[histIndex] || history[history.length-1];
+  if (item) { expr = item.expr; renderAll(); }
+});
+nextHistBtn.addEventListener('click', ()=>{
+  if (history.length===0) return;
+  if (histIndex > 0) histIndex--;
+  if (histIndex === 0) { expr = ''; histIndex = -1; renderAll(); return; }
+  const item = history[histIndex] || null;
+  if (item) { expr = item.expr; renderAll(); }
+});
+
+/* ---------- Keyboard support ---------- */
+window.addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter') { e.preventDefault(); evaluateExpression(); return; }
+  if (e.key === 'Backspace') { expr = expr.slice(0,-1); renderAll(); return; }
+  if (e.key === 'Escape') { expr = ''; renderAll(); return; }
+  if (/^[0-9+\-*/^().]$/.test(e.key)) { expr += e.key; renderAll(); return; }
+  if (e.key.toLowerCase() === 'p') { expr += 'pi'; renderAll(); return; }
+  if (e.key.toLowerCase() === 'a') { expr += 'Ans'; renderAll(); return; }
+});
+
+/* ---------- Export / Clear storage ---------- */
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  // export current state as JSON for backup
+  const data = {expr, ans, memory, history};
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'casio_emulator_state.json'; a.click();
+  URL.revokeObjectURL(url);
+  log('Exported state');
+});
+document.getElementById('clearStorage').addEventListener('click', ()=>{
+  if (!confirm('Hapus lokal storage (memory, history, last expr)?')) return;
+  localStorage.removeItem('casio_full_state');
+  expr = ''; ans = 0; memory = 0; history = []; histIndex = -1;
+  renderAll(); rebuildHistoryUI(); log('Cleared storage');
+});
+
+/* ---------- Init ---------- */
+loadState();
+rebuildHistoryUI();
+renderAll();
+log('Emulator FULL ready. Untuk 100% offline: unduh math.min.js & MathJax; ganti tag <script> ke file lokal.');
+</script>
+</body>
+</html>
